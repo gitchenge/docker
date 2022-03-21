@@ -1,0 +1,8 @@
+healthCheckPath: "/api/status"
+
+ingress:
+  enabled: true
+  hosts:
+    - host: kibana.local
+      paths:
+        - path: /

@@ -1,0 +1,39 @@
+# 一个 Pod 包含两个强耦合的应用, 并共享数据
+apiVersion: v1
+kind: Pod
+metadata:
+  name: volume-mounts-example
+  labels:
+    app: volume-mounts-example
+spec:
+  containers:
+    - name: write
+      image: centos
+      command: ["bash", "-c", "for i in {1..9999};do echo $i >> /data/hello;sleep 1;done"]
+      volumeMounts:
+        - name: data
+          mountPath: /data
+      resources:
+        requests:
+          memory: "10Mi"
+          cpu: "32m"
+        limits:
+          memory: "32Mi"
+          cpu: "64m"
+    - name: read
+      image: centos
+      command: ["bash", "-c", "tail -f /data/hello"]
+      volumeMounts:
+        - name: data
+          mountPath: /data
+      resources:
+        requests:
+          memory: "10Mi"
+          cpu: "32m"
+        limits:
+          memory: "32Mi"
+          cpu: "64m"
+  restartPolicy: Always
+  volumes:
+    - name: data
+      emptyDir: {}

@@ -1,0 +1,106 @@
+pipeline {
+  environment {
+    imageName = "${JOB_NAME}"
+    imageTag = new Date().format('yyyyMMdd-HHmmss', TimeZone.getTimeZone("Asia/Shanghai"))
+
+    dockerEndpoint = 'registry.cn-shenzhen.aliyuncs.com/no_today/learning'
+    dockerCredential = credentials('aliyun-docker-register')
+  }
+
+  options {
+    buildDiscarder(logRotator(numToKeepStr: '5'))
+  }
+
+  parameters {
+    string(name: 'PERSON', defaultValue: 'Mr Jenkins', description: 'Who should I say hello to?')
+    text(name: 'BIOGRAPHY', defaultValue: '', description: 'Enter some information about the person')
+    booleanParam(name: 'TOGGLE', defaultValue: true, description: 'Toggle this value')
+    choice(name: 'CHOICE', choices: ['One', 'Two', 'Three'], description: 'Pick something')
+    password(name: 'PASSWORD', defaultValue: 'SECRET', description: 'Enter a password')
+  }
+
+  agent {
+      kubernetes {
+        yaml '''
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+    - name: maven
+      image: maven:3.8-openjdk-11
+      command:
+        - cat
+      tty: true
+      volumeMounts:
+        - name: m2
+          mountPath: /root/.m2
+    - name: node
+      image: node:17
+      command:
+        - cat
+      tty: true
+    - name: docker
+      image: docker:20.10.12
+      command:
+        - cat
+      tty: true
+      volumeMounts:
+        - name: dockersock
+          mountPath: /var/run/docker.sock
+  volumes:
+    - name: dockersock
+      hostPath:
+        path: /var/run/docker.sock
+    - name: m2
+      hostPath:
+        path: /root/.m2
+          '''
+      }
+    }
+    stages {
+      stage('Init') {
+        steps {
+          sh 'echo params: ${params}'
+          sh 'echo params: ${imageName}'
+          sh 'echo params: ${imageTag}'
+        }
+      }
+      stage('Node') {
+        steps {
+          container('node') {
+            sh 'node -v'
+            sh 'npm -v'
+            sh 'yarn -v'
+
+            sh 'yarn config set registry https://registry.npm.taobao.org'
+            sh 'yarn config set strict-ssl false'
+
+            sh 'yarn install'
+            sh 'npx hexo g'
+          }
+        }
+      }
+      stage('Maven') {
+        steps {
+          container('maven') {
+            sh 'mvn -version'
+          }
+        }
+      }
+      stage('Docker') {
+        steps {
+          container('docker') {
+            sh 'docker version'
+
+            sh 'docker login -u ${dockerCredential_USR} -p ${dockerCredential_PSW} ${dockerEndpoint}'
+            sh 'docker build -f .docker/Dockerfile -t ${imageName}:${imageTag} .'
+            sh 'docker tag ${imageName}:${imageTag} ${dockerEndpoint}:${imageTag}'
+            sh 'docker push ${dockerEndpoint}:${imageTag}'
+
+            sh 'docker image prune -f'
+            sh 'docker image prune -f'
+          }
+        }
+      }
+    }
+}
