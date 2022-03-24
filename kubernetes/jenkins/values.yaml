@@ -9,7 +9,7 @@ controller:
       memory: "256Mi"
     limits:
       cpu: "1024m"
-      memory: "2048Mi"
+      memory: "3072Mi"
   ingress:
     enabled: true
     annotations:
